@@ -646,7 +646,7 @@ abstract class Entity
                     try {
                         $defaultStore = $this->storeHelper->getDefaultStore($websiteId);
 
-                        if (!$this->variableHelper->isEmpty($defaultStore->getId())) {
+                        if (!$this->variables->isEmpty($defaultStore->getId())) {
                             $element['store_id'] = $defaultStore->getId();
                         } else {
                             $this->addTransformedInvalidElementReason(
@@ -666,7 +666,7 @@ abstract class Entity
                     try {
                         $defaultStore = $this->storeHelper->getDefaultStore($websiteName);
 
-                        if (!$this->variableHelper->isEmpty($defaultStore->getId())) {
+                        if (!$this->variables->isEmpty($defaultStore->getId())) {
                             $element['store_id'] = $defaultStore->getId();
                         } else {
                             $this->addTransformedInvalidElementReason(
@@ -689,7 +689,7 @@ abstract class Entity
                 try {
                     $defaultStore = $this->storeHelper->getDefaultStore($websiteId);
 
-                    if (!$this->variableHelper->isEmpty($defaultStore->getId())) {
+                    if (!$this->variables->isEmpty($defaultStore->getId())) {
                         $element['store_id'] = $defaultStore->getId();
                     } else {
                         $this->addTransformedInvalidElementReason(
@@ -844,7 +844,7 @@ abstract class Entity
                 $this->transformedCreateElementNumbers[] = $elementNumber;
             } else {
                 if ($this->updateAdminStore) {
-                    $adminElement = $this->arrayHelper->arrayCopy($element);
+                    $adminElement = $this->arrays->arrayCopy($element);
 
                     $adminElement['store_id'] = 0;
 
@@ -1321,7 +1321,7 @@ abstract class Entity
                 continue;
             }
 
-            $this->storeIds[$elementNumber] = $this->arrayHelper->getValue($element, 'store_id');
+            $this->storeIds[$elementNumber] = $this->arrays->getValue($element, 'store_id');
         }
     }
 
@@ -1536,7 +1536,7 @@ abstract class Entity
                         $optionId = $this->attributeHelper->getAttributeOptionId(
                             $entityTypeCode,
                             $attributeCode,
-                            $this->variableHelper->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
+                            $this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
                             $attributeValue
                         );
 
@@ -1563,7 +1563,7 @@ abstract class Entity
                     $optionId = $this->attributeHelper->getAttributeOptionId(
                         $entityTypeCode,
                         $attributeCode,
-                        $this->variableHelper->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
+                        $this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
                         $attributeValue
                     );
 
@@ -1597,7 +1597,7 @@ abstract class Entity
                 $addAdminValue = !array_key_exists($attributeCode, $currentAdminAttributeValues)
                     || $currentAdminAttributeValues[$attributeCode] === null;
 
-                $addEmptyAdminValue = ($this->variableHelper->isEmpty($forceStoreId) ? $storeId : $forceStoreId) !== 0;
+                $addEmptyAdminValue = ($this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId) !== 0;
             } else {
                 $attribute = $this->attributeHelper->getAttribute($entityTypeCode, $attributeCode);
 
@@ -1622,7 +1622,7 @@ abstract class Entity
                         || $currentAdminAttributeValues[$attributeCode] === null;
                 }
 
-                $addEmptyAdminValue = ($this->variableHelper->isEmpty($forceStoreId) ? $storeId : $forceStoreId) !== 0
+                $addEmptyAdminValue = ($this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId) !== 0
                     && ((int) $attribute->getData('is_required')) !== 1
                     && !$isScopeGlobal;
             }
@@ -1657,7 +1657,7 @@ abstract class Entity
                 $addAdminValue = !array_key_exists($attributeCode, $currentAdminAttributeValues)
                     || $currentAdminAttributeValues[$attributeCode] === null;
 
-                $addEmptyAdminValue = ($this->variableHelper->isEmpty($forceStoreId) ? $storeId : $forceStoreId) !== 0;
+                $addEmptyAdminValue = ($this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId) !== 0;
             } else {
                 $attribute = $this->attributeHelper->getAttribute($entityTypeCode, $attributeCode);
 
@@ -1667,7 +1667,7 @@ abstract class Entity
                     || $currentAdminAttributeValues[$attributeCode] === null
                     || $isScopeGlobal;
 
-                $addEmptyAdminValue = ($this->variableHelper->isEmpty($forceStoreId) ? $storeId : $forceStoreId) !== 0
+                $addEmptyAdminValue = ($this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId) !== 0
                     && ((int) $attribute->getData('is_required')) !== 1
                     && !$isScopeGlobal;
             }
@@ -1696,7 +1696,7 @@ abstract class Entity
         return $this->createAttributeUpdates(
             $entityTypeCode,
             $entityId,
-            $this->variableHelper->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
+            $this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
             $attributeCode,
             $attributeValue,
             !$isCreatedEntity,
@@ -1750,9 +1750,9 @@ abstract class Entity
         );
 
         foreach ($updates as $update) {
-            $type = $this->arrayHelper->getValue($update, 'type');
-            $table = $this->arrayHelper->getValue($update, 'table');
-            $tableData = $this->arrayHelper->getValue($update, 'data');
+            $type = $this->arrays->getValue($update, 'type');
+            $table = $this->arrays->getValue($update, 'table');
+            $tableData = $this->arrays->getValue($update, 'data');
 
             if ($type === 'single') {
                 $this->addSingleAttributeTableData($table, $attributeCode, $tableData);
