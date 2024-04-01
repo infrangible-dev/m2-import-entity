@@ -46,7 +46,10 @@ abstract class Entity
     private $storeIds = [];
 
     /** @var array */
-    private $entityIds = [];
+    private $sourceDataEntityIds = [];
+
+    /** @var array */
+    private $transformedDataEntityIds = [];
 
     /** @var array */
     private $prohibitAdminEavAttributeValues = [];
@@ -158,7 +161,7 @@ abstract class Entity
         parent::runImport();
 
         foreach ($this->getTransformedChangedElementNumbers() as $elementNumber) {
-            $this->addImportedEntity($this->entityIds[$elementNumber], $this->storeIds[$elementNumber]);
+            $this->addImportedEntity($this->transformedDataEntityIds[$elementNumber], $this->storeIds[$elementNumber]);
         }
     }
 
@@ -367,6 +370,119 @@ abstract class Entity
      * @return string
      */
     abstract protected function getEntityLogName(): string;
+
+    /**
+     * @param array $sourceData
+     *
+     * @return array
+     */
+    protected function prepareSourceData(array $sourceData): array
+    {
+        $this->determineSourceDataEntityIds($sourceData);
+
+        foreach (array_keys($sourceData) as $sourceElementNumber) {
+            if (array_key_exists($sourceElementNumber, $this->sourceDataEntityIds)) {
+                $sourceData[$sourceElementNumber]['entity_id'] = $this->sourceDataEntityIds[$sourceElementNumber];
+            }
+        }
+
+        return $sourceData;
+    }
+
+    /**
+     * @return  void
+     */
+    private function determineSourceDataEntityIds(array $sourceData)
+    {
+        $sourceElementKeyValues = [];
+
+        foreach ($sourceData as $sourceElementNumber => $sourceElement) {
+            if (in_array($sourceElementNumber, $this->getSourceInvalidElementNumbers())) {
+                continue;
+            }
+
+            if (array_key_exists('entity_id', $sourceElement)) {
+                $this->sourceDataEntityIds[$sourceElementNumber] = $sourceElement['entity_id'];
+            } else {
+                $elementKey = $this->getSourceElementKey($sourceElement);
+
+                if (array_key_exists($elementKey, $sourceElement)) {
+                    $sourceElementKeyValues[$sourceElementNumber] = $sourceElement[$elementKey];
+                }
+            }
+        }
+
+        $entityIdsInElementsCount = count($this->sourceDataEntityIds);
+
+        $this->logging->debug(
+            sprintf('Found %d entity id(s) directly in source elements', $entityIdsInElementsCount)
+        );
+
+        $this->logging->debug(
+            sprintf(
+                'Searching entity ids for %d unknown entries found in elements',
+                count($sourceElementKeyValues)
+            )
+        );
+
+        foreach ($this->findSourceDataEntityIds($sourceElementKeyValues) as $elementNumber => $entityId) {
+            $this->sourceDataEntityIds[$elementNumber] = $entityId;
+        }
+
+        $this->logging->debug(
+            sprintf(
+                'Found %d entity id(s) in source elements and searching with element key',
+                count($this->sourceDataEntityIds)
+            )
+        );
+    }
+
+    /**
+     * @param array $sourceElement
+     *
+     * @return string
+     */
+    abstract protected function getSourceElementKey(array $sourceElement): string;
+
+    /**
+     * @param array $sourceElementKeys
+     *
+     * @return array
+     */
+    abstract protected function findSourceDataEntityIds(array $sourceElementKeys): array;
+
+    /**
+     * @param array $sourceData
+     *
+     * @return array
+     */
+    protected function transformData(array $sourceData): array
+    {
+        $transformedData = [];
+
+        foreach ($sourceData as $sourceElementNumber => $sourceElement) {
+            $transformedElementNumber = count($transformedData);
+
+            try {
+                $transformedData[$transformedElementNumber] =
+                    $this->transformElement($sourceElementNumber, $sourceElement);
+
+                $this->addSourceTransformedRelation($sourceElementNumber, $transformedElementNumber);
+            } catch (Exception $exception) {
+                $this->addSourceInvalidElementReason($sourceElementNumber, $exception->getMessage());
+            }
+        }
+
+        return $transformedData;
+    }
+
+    /**
+     * @param int   $sourceElementNumber
+     * @param array $sourceElement
+     *
+     * @return array
+     */
+    abstract protected function transformElement(int $sourceElementNumber, array $sourceElement): array;
 
     /**
      * @param int    $elementNumber
@@ -811,7 +927,7 @@ abstract class Entity
             }
         }
 
-        $elementKey = $this->getElementKey($element);
+        $elementKey = $this->getTransformedElementKey($element);
 
         if (!array_key_exists('entity_id', $element) && !array_key_exists($elementKey, $element)) {
             $validationResult = false;
@@ -831,7 +947,7 @@ abstract class Entity
      */
     protected function importTransformedData(AdapterInterface $dbAdapter)
     {
-        $this->determineEntityIds();
+        $this->determineTransformedDataEntityIds();
 
         foreach ($this->getTransformedData() as $elementNumber => $element) {
             if (in_array($elementNumber, $this->getTransformedInvalidElementNumbers())
@@ -840,7 +956,7 @@ abstract class Entity
                 continue;
             }
 
-            if (!isset($this->entityIds[$elementNumber])) {
+            if (!array_key_exists($elementNumber, $this->transformedDataEntityIds[$elementNumber])) {
                 $this->transformedCreateElementNumbers[] = $elementNumber;
             } else {
                 if ($this->updateAdminStore) {
@@ -852,7 +968,8 @@ abstract class Entity
 
                     $transformedData = $this->getTransformedData();
 
-                    $this->entityIds[count($transformedData) - 1] = $this->entityIds[$elementNumber];
+                    $this->transformedDataEntityIds[count($transformedData) - 1] =
+                        $this->transformedDataEntityIds[$elementNumber];
                 }
             }
         }
@@ -923,13 +1040,13 @@ abstract class Entity
                         continue;
                     }
 
-                    $elementKey = $this->getElementKey($element);
+                    $elementKey = $this->getTransformedElementKey($element);
 
                     if (array_key_exists($elementKey, $element)) {
                         $elementKeyValue = $element[$elementKey];
 
                         if (array_key_exists($elementKeyValue, $createdEntityIds)) {
-                            $this->entityIds[$elementNumber] = $createdEntityIds[$elementKeyValue];
+                            $this->transformedDataEntityIds[$elementNumber] = $createdEntityIds[$elementKeyValue];
 
                             unset($this->transformedCreateElementNumbers[$key]);
                         }
@@ -950,7 +1067,7 @@ abstract class Entity
                         $chunkAttributeCodes[] = $attributeCode;
                     }
 
-                    $chunkEntityIds[] = $this->entityIds[$elementNumber];
+                    $chunkEntityIds[] = $this->transformedDataEntityIds[$elementNumber];
                 }
 
                 $chunkAttributeCodes = array_unique($chunkAttributeCodes);
@@ -984,7 +1101,7 @@ abstract class Entity
                         $tableData[$createAttributeCode] = $createAttributeValue;
                     }
 
-                    $elementKey = $this->getElementKey($element);
+                    $elementKey = $this->getTransformedElementKey($element);
 
                     if ($this->addElementKeyToCreateEntityData) {
                         if (array_key_exists($elementKey, $element)) {
@@ -1005,7 +1122,7 @@ abstract class Entity
                 $this->saveCreateTableData($dbAdapter, $createTableName, $importChunk);
 
                 foreach ($importChunk as $elementNumber => $element) {
-                    if (!array_key_exists($elementNumber, $this->entityIds)) {
+                    if (!array_key_exists($elementNumber, $this->transformedDataEntityIds)) {
                         $this->addTransformedInvalidElementReason(
                             $elementNumber,
                             sprintf('Could not identify %s to update', $this->getEntityLogName())
@@ -1019,7 +1136,7 @@ abstract class Entity
                         continue;
                     }
 
-                    $entityId = $this->entityIds[$elementNumber];
+                    $entityId = $this->transformedDataEntityIds[$elementNumber];
                     $entityCurrentAttributeValues =
                         array_key_exists($entityId, $currentAttributeValues) ? $currentAttributeValues[$entityId] : [];
                     $entityCurrentAdminAttributeValues = array_key_exists($entityId, $currentAdminAttributeValues) ?
@@ -1072,7 +1189,7 @@ abstract class Entity
                                 sprintf(
                                     'Could not update %s with id: %d with values of store with id: %d because: %s',
                                     $this->getEntityLogName(),
-                                    $this->entityIds[$elementNumber],
+                                    $this->transformedDataEntityIds[$elementNumber],
                                     $storeId,
                                     $exception->getMessage()
                                 )
@@ -1101,7 +1218,7 @@ abstract class Entity
                         continue;
                     }
 
-                    $entityId = $this->entityIds[$elementNumber];
+                    $entityId = $this->transformedDataEntityIds[$elementNumber];
 
                     foreach ($element as $itemName => $attributeValue) {
                         if ($attributeValue instanceof Associated) {
@@ -1131,7 +1248,7 @@ abstract class Entity
                         continue;
                     }
 
-                    $entityId = $this->entityIds[$elementNumber];
+                    $entityId = $this->transformedDataEntityIds[$elementNumber];
                     $isCreatedEntity = in_array($elementNumber, $this->transformedCreateElementNumbers);
                     $hasChanges = false;
 
@@ -1234,81 +1351,85 @@ abstract class Entity
     /**
      * @return  void
      */
-    private function determineEntityIds()
+    private function determineTransformedDataEntityIds()
     {
-        $elementKeyValues = [];
+        $transformedData = $this->getTransformedData();
 
-        foreach ($this->getTransformedData() as $elementNumber => $element) {
-            if (in_array($elementNumber, $this->getTransformedInvalidElementNumbers())
-                || in_array($elementNumber, $this->getTransformedCachedElementNumbers())
-                || in_array($elementNumber, $this->getTransformedImportedElementNumbers())) {
+        $transformedElementKeyValues = [];
+
+        foreach ($transformedData as $transformedElementNumber => $transformedElement) {
+            if (in_array($transformedElementNumber, $this->getTransformedInvalidElementNumbers())
+                || in_array($transformedElementNumber, $this->getTransformedCachedElementNumbers())
+                || in_array($transformedElementNumber, $this->getTransformedImportedElementNumbers())) {
                 continue;
             }
 
-            if (array_key_exists('entity_id', $element)) {
-                $this->entityIds[$elementNumber] = $element['entity_id'];
+            if (array_key_exists('entity_id', $transformedElement)) {
+                $this->transformedDataEntityIds[$transformedElementNumber] = $transformedElement['entity_id'];
             } else {
-                $elementKey = $this->getElementKey($element);
+                $elementKey = $this->getTransformedElementKey($transformedElement);
 
-                if (array_key_exists($elementKey, $element)) {
-                    $elementKeyValues[$elementNumber] = $element[$elementKey];
+                if (array_key_exists($elementKey, $transformedElement)) {
+                    $transformedElementKeyValues[$transformedElementNumber] = $transformedElement[$elementKey];
                 }
             }
         }
 
-        $entityIdInElementCount = count($this->entityIds);
+        $entityIdsInElementsCount = count($this->transformedDataEntityIds);
 
-        $this->logging->debug(sprintf('Found %d entity id(s) directly in elements', $entityIdInElementCount));
+        $this->logging->debug(
+            sprintf('Found %d entity id(s) directly in transformed elements', $entityIdsInElementsCount)
+        );
 
         $createdEntityIds = $this->getCreatedEntityIds();
 
-        foreach ($this->getTransformedData() as $elementNumber => $element) {
-            $elementKey = $this->getElementKey($element);
+        foreach ($transformedData as $transformedElementNumber => $transformedElement) {
+            $elementKey = $this->getTransformedElementKey($transformedElement);
 
             if (array_key_exists($elementKey, $createdEntityIds)) {
-                $this->entityIds[$elementNumber] = $createdEntityIds[$elementKey];
+                $this->transformedDataEntityIds[$transformedElementNumber] = $createdEntityIds[$elementKey];
             }
         }
 
         $this->logging->debug(
             sprintf(
                 'Found %d entity id(s) previously created',
-                count($this->entityIds) - $entityIdInElementCount
+                count($this->transformedDataEntityIds) - $entityIdsInElementsCount
             )
         );
 
         $this->logging->debug(
             sprintf(
-                'Searching entity ids for %d unknown entries found in elements',
-                count($elementKeyValues)
+                'Searching entity ids for %d unknown entries found in transformed elements',
+                count($transformedElementKeyValues)
             )
         );
 
-        foreach ($this->determineElementEntityIds($elementKeyValues) as $elementNumber => $entityId) {
-            $this->entityIds[$elementNumber] = $entityId;
+        foreach ($this->findTransformedDataEntityIds($transformedElementKeyValues) as $elementNumber => $entityId) {
+            $this->transformedDataEntityIds[$elementNumber] = $entityId;
         }
 
         $this->logging->debug(
             sprintf(
-                'Found %d entity id(s) in elements and searching with element key',
-                count($this->entityIds)
+                'Found %d entity id(s) in transformed elements and searching with element key',
+                count($this->transformedDataEntityIds)
             )
         );
     }
 
     /**
-     * @param array $element
+     * @param array $transformedElement
      *
      * @return string
      */
-    abstract protected function getElementKey(array $element): string;
+    abstract protected function getTransformedElementKey(array $transformedElement): string;
 
     /**
-     * @param array $elementKeys
+     * @param array $transformedElementKeys
      *
      * @return array
      */
-    abstract protected function determineElementEntityIds(array $elementKeys): array;
+    abstract protected function findTransformedDataEntityIds(array $transformedElementKeys): array;
 
     /**
      * @return  void
@@ -1357,13 +1478,13 @@ abstract class Entity
             foreach ($createdIds[$createTableName] as $elementNumber => $entityId) {
                 $element = $importChunk[$elementNumber];
 
-                $elementKey = $this->getElementKey($element);
+                $elementKey = $this->getTransformedElementKey($element);
 
                 $elementKeyValue = array_key_exists($elementKey, $element) ? $element[$elementKey] : null;
 
                 $this->logging->info(sprintf('Created entity with key: %s has id: %d', $elementKeyValue, $entityId));
 
-                $this->entityIds[$elementNumber] = $entityId;
+                $this->transformedDataEntityIds[$elementNumber] = $entityId;
 
                 $this->addCreatedEntityId($elementKeyValue, $entityId);
             }
