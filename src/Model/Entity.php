@@ -2006,4 +2006,20 @@ abstract class Entity
     {
         $this->associatedItemPrepareModels[$key] = $model;
     }
+
+    /**
+     * @return array
+     */
+    public function getSourceDataEntityIds(): array
+    {
+        return $this->sourceDataEntityIds;
+    }
+
+    /**
+     * @return array
+     */
+    public function getTransformedDataEntityIds(): array
+    {
+        return $this->transformedDataEntityIds;
+    }
 }
