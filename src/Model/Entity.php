@@ -16,11 +16,11 @@ use Infrangible\Core\Helper\Stores;
 use Infrangible\Import\Helper\Data;
 use Infrangible\Import\Model\Import;
 use Infrangible\Import\Model\Related;
+use Magento\Eav\Model\Entity\Collection\AbstractCollection;
 use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\Framework\Exception\NoSuchEntityException;
 use Magento\Store\Model\Store;
 use Psr\Log\LoggerInterface;
-use Zend_Db_Select_Exception;
 
 /**
  * @author      Andreas Knollmann
@@ -943,7 +943,6 @@ abstract class Entity
      *
      * @return void
      * @throws Exception
-     * @throws Zend_Db_Select_Exception
      */
     protected function importTransformedData(AdapterInterface $dbAdapter)
     {
@@ -956,7 +955,7 @@ abstract class Entity
                 continue;
             }
 
-            if (!array_key_exists($elementNumber, $this->transformedDataEntityIds[$elementNumber])) {
+            if (!array_key_exists($elementNumber, $this->transformedDataEntityIds)) {
                 $this->transformedCreateElementNumbers[] = $elementNumber;
             } else {
                 if ($this->updateAdminStore) {
@@ -1078,7 +1077,8 @@ abstract class Entity
                     $storeId,
                     $chunkAttributeCodes,
                     $chunkEntityIds,
-                    $this->getSpecialAttributes()
+                    $this->getSpecialAttributes(),
+                    $this->getEntityCollection()
                 );
 
                 $currentAdminAttributeValues = $this->exportHelper->getCurrentAttributeValues(
@@ -1087,7 +1087,8 @@ abstract class Entity
                     0,
                     $chunkAttributeCodes,
                     $chunkEntityIds,
-                    $this->getSpecialAttributes()
+                    $this->getSpecialAttributes(),
+                    $this->getEntityCollection()
                 );
 
                 foreach ($importChunk as $elementNumber => $element) {
@@ -1365,7 +1366,7 @@ abstract class Entity
             }
 
             if (array_key_exists('entity_id', $transformedElement)) {
-                $this->transformedDataEntityIds[$transformedElementNumber] = $transformedElement['entity_id'];
+                $this->transformedDataEntityIds[$transformedElementNumber] = intval($transformedElement['entity_id']);
             } else {
                 $elementKey = $this->getTransformedElementKey($transformedElement);
 
@@ -1406,7 +1407,7 @@ abstract class Entity
         );
 
         foreach ($this->findTransformedDataEntityIds($transformedElementKeyValues) as $elementNumber => $entityId) {
-            $this->transformedDataEntityIds[$elementNumber] = $entityId;
+            $this->transformedDataEntityIds[$elementNumber] = intval($entityId);
         }
 
         $this->logging->debug(
@@ -1647,21 +1648,51 @@ abstract class Entity
                 $attributeType = \Magento\ImportExport\Model\Import::getAttributeType($attribute);
 
                 if ($attributeType == 'multiselect') {
-                    $attributeValues = explode(',', $attributeValue);
+                    if (!$this->variables->isEmpty($attributeValue)) {
+                        $attributeValues = explode(',', $attributeValue);
 
-                    $attributeOptionIds = [];
+                        $attributeOptionIds = [];
 
-                    foreach ($attributeValues as $attributeValue) {
-                        $attributeValue = trim($attributeValue);
+                        foreach ($attributeValues as $attributeValue) {
+                            $attributeValue = trim($attributeValue);
 
+                            $optionId = $this->attributeHelper->getAttributeOptionId(
+                                $entityTypeCode,
+                                $attributeCode,
+                                $this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
+                                $attributeValue
+                            );
+
+                            if (empty($optionId)) {
+                                if (!is_numeric($attributeValue)
+                                    && \Magento\ImportExport\Model\Import::getAttributeType($attribute) == 'int') {
+                                    throw new Exception(
+                                        sprintf(
+                                            'Invalid value "%s" in attribute with code: %s',
+                                            $attributeValue,
+                                            $attributeCode
+                                        )
+                                    );
+                                }
+
+                                $attributeOptionIds[] = $attributeValue;
+                            } else {
+                                $attributeOptionIds[] = $optionId;
+                            }
+                        }
+
+                        $attributeValue = implode(',', $attributeOptionIds);
+                    }
+                } else {
+                    if (!$this->variables->isEmpty($attributeValue)) {
                         $optionId = $this->attributeHelper->getAttributeOptionId(
                             $entityTypeCode,
                             $attributeCode,
                             $this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
-                            $attributeValue
+                            strval($attributeValue)
                         );
 
-                        if (empty($optionId)) {
+                        if ($optionId === null) {
                             if (!is_numeric($attributeValue)
                                 && \Magento\ImportExport\Model\Import::getAttributeType($attribute) == 'int') {
                                 throw new Exception(
@@ -1672,35 +1703,9 @@ abstract class Entity
                                     )
                                 );
                             }
-
-                            $attributeOptionIds[] = $attributeValue;
                         } else {
-                            $attributeOptionIds[] = $optionId;
+                            $attributeValue = $optionId;
                         }
-                    }
-
-                    $attributeValue = implode(',', $attributeOptionIds);
-                } else {
-                    $optionId = $this->attributeHelper->getAttributeOptionId(
-                        $entityTypeCode,
-                        $attributeCode,
-                        $this->variables->isEmpty($forceStoreId) ? $storeId : $forceStoreId,
-                        $attributeValue
-                    );
-
-                    if ($optionId === null) {
-                        if (!is_numeric($attributeValue)
-                            && \Magento\ImportExport\Model\Import::getAttributeType($attribute) == 'int') {
-                            throw new Exception(
-                                sprintf(
-                                    'Invalid value "%s" in attribute with code: %s',
-                                    $attributeValue,
-                                    $attributeCode
-                                )
-                            );
-                        }
-                    } else {
-                        $attributeValue = $optionId;
                     }
                 }
             }
@@ -2022,4 +2027,6 @@ abstract class Entity
     {
         return $this->transformedDataEntityIds;
     }
+
+    abstract protected function getEntityCollection(): AbstractCollection;
 }
