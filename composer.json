@@ -1,14 +1,26 @@
 {
     "name": "infrangible/m2-import-entity",
     "description": "Infrangible Magento 2 Import Entity",
+    "type": "magento2-module",
+    "version": "1.1.1",
+    "license": "MIT",
+    "keywords": [
+        "Magento"
+    ],
+    "homepage": "https://github.com/infrangible-dev/m2-import-entity",
+    "authors": [
+        {
+            "name": "Andreas Knollmann",
+            "email": "a.knollmann@seak.dev",
+            "homepage": "https://www.seak.dev",
+            "role": "Developer"
+        }
+    ],
     "require": {
         "php": ">=7.1",
         "magento/framework": "~102.0.0|~103.0.0",
         "infrangible/m2-import": "~1.1"
     },
-    "type": "magento2-module",
-    "version": "1.1.0",
-    "license": "MIT",
     "autoload": {
         "files": [
             "src/registration.php"

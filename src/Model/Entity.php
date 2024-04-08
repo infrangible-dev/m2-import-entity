@@ -1485,9 +1485,9 @@ abstract class Entity
 
                 $this->logging->info(sprintf('Created entity with key: %s has id: %d', $elementKeyValue, $entityId));
 
-                $this->transformedDataEntityIds[$elementNumber] = $entityId;
+                $this->transformedDataEntityIds[$elementNumber] = intval($entityId);
 
-                $this->addCreatedEntityId($elementKeyValue, $entityId);
+                $this->addCreatedEntityId($elementKeyValue, intval($entityId));
             }
         }
     }
