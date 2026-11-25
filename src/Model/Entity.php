@@ -29,6 +29,8 @@ use Magento\Framework\DB\Adapter\AdapterInterface;
 use Magento\ImportExport\Model\Import as ImportExport;
 use Magento\Store\Model\Store;
 use Psr\Log\LoggerInterface;
+use RuntimeException;
+use UnexpectedValueException;
 
 /**
  * The import of the elements of an EAV entity type, for example products or categories: finds the entities of the
@@ -1149,7 +1151,7 @@ abstract class Entity extends Import
         $entityType = $this->entityTypeHelper->getEntityType($this->getEntityTypeCode());
 
         if ($entityType === null) {
-            throw new Exception(sprintf('Unknown entity type: %s', $this->getEntityTypeCode()));
+            throw new RuntimeException(sprintf('Unknown entity type: %s', $this->getEntityTypeCode()));
         }
 
         $createTableName = $this->entityTypeHelper->getEntityTypeTableByEntityType($entityType);
@@ -2099,7 +2101,7 @@ abstract class Entity extends Import
 
             if ($optionId === null || ($isMultiSelect && $optionId === 0)) {
                 if (! is_numeric($value) && $this->getBackendType($attribute) === 'int') {
-                    throw new Exception(
+                    throw new UnexpectedValueException(
                         sprintf('Invalid value "%s" in attribute with code: %s', $value, $attributeCode)
                     );
                 }
@@ -2228,7 +2230,7 @@ abstract class Entity extends Import
             $tableData = $update['data'];
 
             if ($table === null) {
-                throw new Exception(sprintf('Found no table for the values of attribute: %s', $attributeCode));
+                throw new RuntimeException(sprintf('Found no table for the values of attribute: %s', $attributeCode));
             }
 
             if ($update['type'] === 'single') {
