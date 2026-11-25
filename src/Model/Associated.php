@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+/**
+ * @author      Andreas Knollmann
+ * @copyright   Copyright (c) 2014-2026 Softwareentwicklung Andreas Knollmann
+ * @license     http://www.opensource.org/licenses/mit-license.php MIT
+ */
+
 namespace Infrangible\ImportEntity\Model;
 
 use Exception;
@@ -11,42 +17,44 @@ use Magento\Framework\DB\Adapter\AdapterInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * @author      Andreas Knollmann
- * @copyright   Copyright (c) 2014-2024 Softwareentwicklung Andreas Knollmann
- * @license     http://www.opensource.org/licenses/mit-license.php MIT
+ * Associated data of an imported entity, for example the images or links of a product, saved in their own tables.
  */
-abstract class Associated
-    extends Extended
+abstract class Associated extends Extended
 {
-    /** @var Database */
-    protected $databaseHelper;
-
     /**
-     * @param Database        $databaseHelper
+     * @param Database $databaseHelper
      * @param LoggerInterface $logging
-     * @param Import          $importer
+     * @param Import $importer
      */
-    public function __construct(Database $databaseHelper, LoggerInterface $logging, Import $importer)
-    {
+    public function __construct(
+        protected Database $databaseHelper,
+        LoggerInterface $logging,
+        Import $importer
+    ) {
         parent::__construct($logging, $importer);
-
-        $this->databaseHelper = $databaseHelper;
     }
 
     /**
+     * Takes the associated data of the element.
+     *
      * @param AdapterInterface $dbAdapter
-     * @param array            $data
-     * @param array            $element
+     * @param array $data
+     * @phpstan-param array<int|string, mixed> $data
+     * @param array $element
+     * @phpstan-param array<string, mixed> $element
      *
      * @return void
      */
-    abstract public function prepare(AdapterInterface $dbAdapter, array $data, array $element);
+    abstract public function prepare(AdapterInterface $dbAdapter, array $data, array $element): void;
 
     /**
+     * Inserts a row into the table, unless in test mode, and returns its ID.
+     *
      * @param AdapterInterface $dbAdapter
-     * @param string           $tableName
-     * @param array            $tableData
-     * @param bool             $checkDuplicate
+     * @param string $tableName
+     * @param array $tableData
+     * @phpstan-param array<string, mixed> $tableData
+     * @param bool $checkDuplicate
      *
      * @return int
      * @throws Exception
@@ -67,10 +75,13 @@ abstract class Associated
     }
 
     /**
+     * Updates the rows of the table, unless in test mode.
+     *
      * @param AdapterInterface $dbAdapter
-     * @param string           $tableName
-     * @param array            $tableData
-     * @param mixed            $where
+     * @param string $tableName
+     * @param array $tableData
+     * @phpstan-param array<string, mixed> $tableData
+     * @param mixed $where
      *
      * @return void
      * @throws Exception
@@ -79,8 +90,8 @@ abstract class Associated
         AdapterInterface $dbAdapter,
         string $tableName,
         array $tableData,
-        $where = null
-    ) {
+        mixed $where = null
+    ): void {
         $this->databaseHelper->updateTableData(
             $dbAdapter,
             $tableName,
@@ -91,16 +102,17 @@ abstract class Associated
     }
 
     /**
+     * Deletes the rows of the table, unless in test mode.
+     *
      * @param AdapterInterface $dbAdapter
-     * @param string           $tableName
-     * @param mixed            $where
+     * @param string $tableName
+     * @param mixed $where
      *
      * @return void
      * @throws Exception
      */
-    protected function deleteTableData(AdapterInterface $dbAdapter, string $tableName, $where = null)
+    protected function deleteTableData(AdapterInterface $dbAdapter, string $tableName, mixed $where = null): void
     {
         $this->databaseHelper->deleteTableData($dbAdapter, $tableName, $where, $this->getImporter()->isTest());
     }
-
 }
