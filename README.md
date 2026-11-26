@@ -43,7 +43,7 @@ also saves the values of existing entities in the admin store; `addCreateDateAtt
 ## Requirements
 
 - Magento Open Source or Adobe Commerce 2.4.6 or newer
-- PHP 8.2 or newer
+- PHP 8.1 or newer
 
 ## Installation
 
